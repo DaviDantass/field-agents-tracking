@@ -1,97 +1,56 @@
-﻿# Field Agents Tracking — Fullstack
+﻿# Field Agents Tracking
 
-Sistema de rastreamento de equipes externas. Backend Spring Boot com sincronização GPS automática, 4 schedulers independentes e circuit breaker. Frontend Next.js consumindo a API REST.
-
----
+Sistema fullstack de rastreamento de agentes de campo. O backend sincroniza posições automaticamente com uma API GPS externa, persiste histórico de localizações e check-ins, e expõe uma API REST completa. O frontend consome essa API.
 
 ## Estrutura
 
 ```
-field-agents-tracking-full/
-├── field-agents-tracking/   backend — Spring Boot 3 + Java 21
-├── frontend/                frontend — Next.js 16 + Tailwind CSS
-└── README.md
+├── field-agents-tracking/   Spring Boot 3 + Java 21
+└── frontend/                Next.js 16 + TypeScript + Tailwind
 ```
 
----
+## Rodando o projeto
 
-## Backend
-
-**Stack:** Java 21 · Spring Boot 3.5 · MySQL · Resilience4j · MapStruct · Swagger/OpenAPI
-
-O backend cobre todos os requisitos obrigatórios e a maioria dos diferenciais:
-
-| Requisito | Status |
-|---|---|
-| CRUD completo de agentes | ✓ |
-| Atualização automática de posições (sync GPS) | ✓ |
-| Registro de check-ins manuais | ✓ |
-| Histórico de rota | ✓ |
-| 4 schedulers independentes | ✓ |
-| Idempotência e tratamento de conflitos | ✓ |
-| Histórico de sincronização persistido | ✓ |
-| WebClient (reativo) | ✓ |
-| Tratamento de rate limit (429) e instabilidade (503) | ✓ |
-| Sincronização incremental com syncToken | ✓ |
-| Swagger / OpenAPI | ✓ (diferencial) |
-| Circuit Breaker + Retry (Resilience4j) | ✓ (diferencial) |
-
-### Rodando o backend
-
-Requer Java 21 e MySQL com banco `tracking` criado.
+**Pré-requisitos:** Java 21, MySQL rodando com o banco `tracking` criado.
 
 ```bash
+# Backend
 cd field-agents-tracking
 ./mvnw spring-boot:run
 ```
 
-API em `http://localhost:8080` · Swagger em `http://localhost:8080/swagger-ui.html`
+Variáveis de ambiente necessárias (o restante já tem default):
 
-Variáveis de ambiente (defaults de dev já configurados):
+```
+DB_PASSWORD=sua_senha
+GPS_API_KEY=sua_chave
+```
 
-| Variável | Default |
-|---|---|
-| `DB_URL` | `jdbc:mysql://localhost:3306/tracking` |
-| `DB_USERNAME` | `root` |
-| `DB_PASSWORD` | —          |
-| `GPS_API_BASE_URL` | `https://desafio-media.onrender.com` |
-| `GPS_API_KEY` | — |
-
----
-
-## Frontend
-
-**Stack:** Next.js 16 · TypeScript · Tailwind CSS
-
-Interface simples para consumo da API. Uma página com listagem de agentes e criação via formulário inline.
-
-### Rodando o frontend
+A API sobe em `http://localhost:8080`. Swagger disponível em `/swagger-ui.html`.
 
 ```bash
+# Frontend
 cd frontend
 npm install
 npm run dev
 ```
 
-App em `http://localhost:3000`
+Frontend em `http://localhost:3000`. O arquivo `frontend/.env.local` já aponta para o backend local.
 
-O arquivo `frontend/.env.local` já aponta para `http://localhost:8080`.
+## Backend
 
----
+O núcleo do projeto. Quatro schedulers rodam de forma independente — um sincroniza posições com a API GPS a cada 5 minutos, outro faz limpeza de histórico antigo, um terceiro monitora estatísticas de sincronização, e o quarto está reservado para validação de geofencing. Cada um pode ser desabilitado individualmente no `application.yaml`.
 
-## Decisões técnicas
+A sincronização com a API GPS usa `syncToken` incremental: a cada ciclo, o sistema busca o token da última sincronização bem-sucedida e envia junto na requisição, recebendo apenas o delta. Isso evita reprocessar todo o histórico a cada 15 segundos em produção.
 
-**Sync incremental com syncToken**
-A cada ciclo o scheduler busca o `nextSyncToken` da última sincronização persistida e envia na chamada à API GPS. A API devolve só o delta — evita reprocessar tudo a cada 15 segundos.
+O `GpsClient` tem circuit breaker configurado pelo Resilience4j — abre com 60% de falhas, aguarda 60s antes de tentar reabrir. Retry automático em até 3 tentativas para `ConnectException`, `503` e `429`. Com o circuito aberto, o scheduler continua rodando normalmente com fallback de lista vazia.
 
-**Idempotência**
-Antes de salvar uma localização, verifica `agent_id + timestamp`. Retries não geram duplicatas.
+Localizações têm verificação de idempotência por `agent_id + timestamp` antes de salvar, então retries não geram duplicatas. Deleção de agente é soft delete (`active = false`), preservando integridade do histórico.
 
-**Circuit Breaker (Resilience4j)**
-O `GpsClient` abre o circuito com 60% de falhas, aguarda 60s e tenta reabrir. Retry em 3 tentativas para `ConnectException`, `503` e `429`. Com o circuito aberto, fallback devolve lista vazia — o scheduler segue rodando.
+**Stack:** Java 21 · Spring Boot 3.5 · MySQL · WebClient · Resilience4j · MapStruct · Swagger/OpenAPI
 
-**Soft delete**
-`DELETE /agents/{id}` seta `active = false`. Histórico de localizações e check-ins preservado com integridade referencial.
+## Frontend
 
-**Schedulers isolados**
-Cada scheduler é um componente Spring independente com `@ConditionalOnProperty`. Falha de um não afeta os outros e cada um pode ser desabilitado individualmente via `application.yaml`.
+Uma página com listagem de agentes e formulário de criação. Sem dependências além do Next.js e Tailwind — `fetch` nativo, `useState` e `useEffect`.
+
+**Stack:** Next.js 16 · TypeScript · Tailwind CSS
