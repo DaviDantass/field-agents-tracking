@@ -1,0 +1,11 @@
+{
+  "name": "field-agents-tracking-full",
+  "private": true,
+  "scripts": {
+    "dev": "npm run dev --prefix frontend",
+    "dev:frontend": "npm run dev --prefix frontend",
+    "dev:backend": "cd field-agents-tracking && ./mvnw spring-boot:run",
+    "install:frontend": "npm install --prefix frontend",
+    "build:frontend": "npm run build --prefix frontend"
+  }
+}

@@ -1,0 +1,76 @@
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/tracking}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: ${JPA_DDL_AUTO:update}
+    show-sql: ${JPA_SHOW_SQL:false}
+    open-in-view: false
+gps:
+  api:
+    base-url: ${GPS_API_BASE_URL:https://desafio-media.onrender.com}
+    key: ${GPS_API_KEY:}
+    sync-token: ${GPS_SYNC_TOKEN:}
+
+app:
+  schedulers:
+    # Scheduler 1: Sincronizacao de Localizacoes
+    sync-locations:
+      enabled: true
+      interval: 15000  # 15 segundos em dev, 300000 (5 min) em prod
+    
+    # Scheduler 2: Geofencing
+    geofencing:
+      enabled: true
+      interval: 600000  # 10 minutos
+    
+    # Scheduler 3: Limpeza de Historico
+    history-cleanup:
+      enabled: true
+      interval: 300000  # 5 minutos em dev
+      cron: "0 0 0 * * *"  # Meia-noite diariamente
+      retention-days: 30
+    
+    # Scheduler 4: Monitoramento
+    monitoring:
+      enabled: true
+      interval: 900000  # 15 minutos
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30000
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+
+    instances:
+      gpsClientService:
+        base-config: default
+        failure-rate-threshold: 60
+        wait-duration-in-open-state: 60000
+        
+  retry:
+    configs:
+      default:
+        max-attempts: 3
+        wait-duration: 1000
+        retry-exceptions:
+          - java.net.ConnectException
+          - org.springframework.web.reactive.function.client.WebClientResponseException$ServiceUnavailable
+          - org.springframework.web.reactive.function.client.WebClientResponseException$TooManyRequests
+    
+    instances:
+      gpsClientRetry:
+        base-config: default
+        max-attempts: 3
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+  api-docs:
+    path: /v3/api-docs
