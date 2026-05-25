@@ -1,12 +1,12 @@
-﻿# Field Agents Tracking
+﻿mu# Field Agents Tracking
 
 Sistema fullstack de rastreamento de agentes de campo. O backend sincroniza posições automaticamente com uma API GPS externa, persiste histórico de localizações e check-ins, e expõe uma API REST completa. O frontend consome essa API.
 
 ## Estrutura
 
 ```
-├── field-agents-tracking/   Spring Boot 3 + Java 21
-└── frontend/                Next.js 16 + TypeScript + Tailwind
+├── backend/    Spring Boot 3 + Java 21
+└── frontend/   Next.js 16 + TypeScript + Tailwind
 ```
 
 ## Rodando o projeto
@@ -15,7 +15,7 @@ Sistema fullstack de rastreamento de agentes de campo. O backend sincroniza posi
 
 ```bash
 # Backend
-cd field-agents-tracking
+cd backend
 ./mvnw spring-boot:run
 ```
 
